@@ -44,3 +44,4 @@ A full‑stack Apple Music–style web player with a FastAPI backend, React (Vit
 - VPS backend runs via `systemd` on port `8000` and is proxied by nginx.
 
 Jenkins automatic deployment tested
+Jenkins automatic deployment tested
