@@ -27,7 +27,7 @@ pipeline {
                 echo 'Validating Docker Compose configuration'
                 withCredentials([
                     sshUserPrivateKey(
-                        credentialsId: 'ec2-ssh-key',
+                        credentialsId: 'ec2-deploy-key',
                         keyFileVariable: 'SSH_KEY',
                         usernameVariable: 'SSH_USER'
                     )
