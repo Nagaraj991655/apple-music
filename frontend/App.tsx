@@ -7,7 +7,7 @@ import AlbumDetailView from './components/AlbumDetailView';
 import LibraryView from './components/LibraryView';
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://api.music.kyawhtet.com";
+  import.meta.env.VITE_API_BASE_URL || "/api";
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewMode>(ViewMode.HOME);

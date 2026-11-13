@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: music-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: musicdb
+      POSTGRES_USER: musicuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U musicuser -d musicdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - music-network
+
+  backend:
+    build: ./backend
+    container_name: music-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://musicuser:${DB_PASSWORD}@db:5432/musicdb
+      MUSIC_DIR: /app/music_library
+    volumes:
+      - ./music_library:/app/music_library:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    networks:
+      - music-network
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: music-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - music-network
+
+volumes:
+  postgres_data:
+
+networks:
+  music-network:
+    driver: bridge
