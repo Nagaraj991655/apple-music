@@ -5,78 +5,85 @@ pipeline {
     options {
         timestamps()
         disableConcurrentBuilds()
+        skipDefaultCheckout(true)
     }
 
     environment {
-        EC2_HOST = '204.236.243.177'
-        DEPLOY_DIR = '/home/ubuntu/apple-music'
-        BRANCH = 'main'
+        COMPOSE_PROJECT_NAME = 'apple-music'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 echo 'Checking out source code from GitHub'
                 checkout scm
+                sh 'git log -1 --oneline'
             }
         }
 
         stage('Validate') {
             steps {
                 echo 'Validating Docker Compose configuration'
-                withCredentials([
-                    sshUserPrivateKey(
-                        credentialsId: 'ec2-deploy-key',
-                        keyFileVariable: 'SSH_KEY',
-                        usernameVariable: 'SSH_USER'
-                    )
-                ]) {
-                    sh '''
-                        ssh -i "$SSH_KEY" \
-                            -o BatchMode=yes \
-                            -o StrictHostKeyChecking=accept-new \
-                            "$SSH_USER@$EC2_HOST" \
-                            "cd $DEPLOY_DIR && docker compose config -q"
-                    '''
-                }
+                sh '''
+                    set -eu
+                    docker --version
+                    docker compose version
+                    docker compose config -q
+                '''
             }
         }
 
-        stage('Deploy to EC2') {
+        stage('Build') {
             steps {
-                echo 'Deploying Apple Music application'
+                echo 'Building Docker images'
+                sh '''
+                    set -eu
+                    docker compose build
+                '''
+            }
+        }
 
-                withCredentials([
-                    sshUserPrivateKey(
-                        credentialsId: 'ec2-ssh-key',
-                        keyFileVariable: 'SSH_KEY',
-                        usernameVariable: 'SSH_USER'
-                    )
-                ]) {
-                    sh '''
-                        ssh -i "$SSH_KEY" \
-                            -o BatchMode=yes \
-                            -o StrictHostKeyChecking=accept-new \
-                            "$SSH_USER@$EC2_HOST" \
-                            "cd $DEPLOY_DIR &&
-                             git pull --ff-only origin $BRANCH &&
-                             docker compose build &&
-                             docker compose up -d &&
-                             docker compose ps"
-                    '''
-                }
+        stage('Deploy') {
+            steps {
+                echo 'Deploying application'
+                sh '''
+                    set -eu
+                    docker compose up -d --remove-orphans
+                    docker compose ps
+                '''
+            }
+        }
+
+        stage('Verify') {
+            steps {
+                echo 'Checking application'
+                sh '''
+                    set -eu
+                    for i in $(seq 1 30); do
+                        if curl -fsS http://localhost/ > /dev/null; then
+                            echo "Application is running successfully"
+                            exit 0
+                        fi
+                        sleep 5
+                    done
+
+                    echo "Application health check failed"
+                    docker compose logs --tail=100
+                    exit 1
+                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Apple Music application deployed successfully!'
+            echo 'APPLE MUSIC DEPLOYMENT SUCCESSFUL'
+            echo 'Application: http://204.236.243.177'
         }
 
         failure {
-            echo 'Pipeline failed. Check the Jenkins console output.'
+            echo 'PIPELINE FAILED - Check Console Output'
+            sh 'docker compose logs --tail=100 || true'
         }
     }
 }
